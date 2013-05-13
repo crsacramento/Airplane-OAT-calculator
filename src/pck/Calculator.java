@@ -28,8 +28,6 @@ public class Calculator {
 	 * @return true air speed
 	 */
 	private static double TAS(double machNumber, double staticAirTemperature) {
-		System.out.println(staticAirTemperature);
-		System.out.println("TAS: " + Math.sqrt(staticAirTemperature / Constants.TEMPERATURE_AT_AIR_LEVEL));
 		return (Constants.SOUND_SPEED_AT_AIR_LEVEL * machNumber * Math
 				.sqrt(staticAirTemperature / Constants.TEMPERATURE_AT_AIR_LEVEL));
 	}
@@ -63,9 +61,11 @@ public class Calculator {
 	public static double[] calculateTAS_OAT(double staticPressure,
 			double dynamicPressure, double temperature) {
 		double machNumber = machNumber(staticPressure, dynamicPressure);
-		System.out.println("M:" + machNumber);
+		System.out.println("M: " + machNumber);
 		double outsideAirTemp = OAT(temperature, machNumber);
+		System.out.println("OAT: " + outsideAirTemp);
 		double trueSpeed = TAS(machNumber, outsideAirTemp);
+		System.out.println("TAS: " + trueSpeed);
 		return new double[] { outsideAirTemp, trueSpeed };
 	}
 }
