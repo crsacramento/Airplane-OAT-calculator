@@ -123,8 +123,8 @@ class Parser {
 		ArrayList<Double> staticPressure = new ArrayList<Double>(), dynamicPressure = new ArrayList<Double>(), temperature = new ArrayList<Double>();
 
 		// initialize static pressure list
-		if (!results.get(Constants.FIRST_PITOT_STATIC).equals(
-				Constants.ERROR_VALUE)) {
+		if (!testInputs(results.get(Constants.FIRST_PITOT_STATIC),
+				Constants.FIRST_PITOT_STATIC)) {
 			staticPressure.add(results.get(Constants.FIRST_PITOT_STATIC));
 		} else {
 			// sensor had an error, ignore input and write to database to ignore
@@ -132,16 +132,18 @@ class Parser {
 			/* var_id,sensor,iters_to_ignore,previous_failure, */
 			modifyBlocksBD(Constants.FIRST_PITOT_STATIC);
 		}
-		if (!results.get(Constants.SECOND_PITOT_STATIC).equals(
-				Constants.ERROR_VALUE)) {
+
+		if (!testInputs(results.get(Constants.SECOND_PITOT_STATIC),
+				Constants.SECOND_PITOT_STATIC)) {
 			staticPressure.add(results.get(Constants.SECOND_PITOT_STATIC));
 		} else {
 			// sensor had an error, ignore input and write to database to ignore
 			// future iterations
 			modifyBlocksBD(Constants.SECOND_PITOT_STATIC);
 		}
-		if (!results.get(Constants.THIRD_PITOT_STATIC).equals(
-				Constants.ERROR_VALUE)) {
+
+		if (!testInputs(results.get(Constants.THIRD_PITOT_STATIC),
+				Constants.THIRD_PITOT_STATIC)) {
 			staticPressure.add(results.get(Constants.THIRD_PITOT_STATIC));
 		} else {
 			// sensor had an error, ignore input and write to database to ignore
@@ -150,21 +152,21 @@ class Parser {
 		}
 
 		// initialize dynamic pressure list
-		if (!results.get(Constants.FIRST_PITOT_DYNAMIC).equals(
-				Constants.ERROR_VALUE)) {
+		if (!testInputs(results.get(Constants.FIRST_PITOT_DYNAMIC),
+				Constants.FIRST_PITOT_DYNAMIC)) {
 			dynamicPressure.add(results.get(Constants.FIRST_PITOT_DYNAMIC));
 		}
-		if (!results.get(Constants.SECOND_PITOT_DYNAMIC).equals(
-				Constants.ERROR_VALUE)) {
+		if (!testInputs(results.get(Constants.SECOND_PITOT_DYNAMIC),
+				Constants.SECOND_PITOT_DYNAMIC)) {
 			dynamicPressure.add(results.get(Constants.SECOND_PITOT_DYNAMIC));
 		}
-		if (!results.get(Constants.THIRD_PITOT_DYNAMIC).equals(
-				Constants.ERROR_VALUE)) {
+		if (!testInputs(results.get(Constants.THIRD_PITOT_DYNAMIC),
+				Constants.THIRD_PITOT_DYNAMIC)) {
 			dynamicPressure.add(results.get(Constants.THIRD_PITOT_DYNAMIC));
 		}
 
 		// initialize temperature list
-		if (!results.get(Constants.FIRST_TEMP).equals(Constants.ERROR_VALUE)) {
+		if (!testInputs(results.get(Constants.FIRST_TEMP), Constants.FIRST_TEMP)) {
 			temperature.add(results.get(Constants.FIRST_TEMP));
 		} else {
 			// sensor had an error, ignore input and write to database to ignore
@@ -172,7 +174,8 @@ class Parser {
 			/* var_id,sensor,iters_to_ignore,previous_failure, */
 			modifyBlocksBD(Constants.FIRST_TEMP);
 		}
-		if (!results.get(Constants.SECOND_TEMP).equals(Constants.ERROR_VALUE)) {
+		if (!testInputs(results.get(Constants.SECOND_TEMP),
+				Constants.SECOND_TEMP)) {
 			temperature.add(results.get(Constants.SECOND_TEMP));
 		} else {
 			// sensor had an error, ignore input and write to database to ignore
@@ -193,7 +196,8 @@ class Parser {
 		// get medians
 		double staticPressureValue = median(staticPressure), dynamicPressureValue = median(dynamicPressure), temperatureValue = median(temperature);
 
-		System.out.println("staticPressureValue: " + staticPressureValue + "\ndynamicPressureValue: " + dynamicPressureValue
+		System.out.println("staticPressureValue: " + staticPressureValue
+				+ "\ndynamicPressureValue: " + dynamicPressureValue
 				+ "\ntemperatureValue: " + temperatureValue);
 
 		double[] arr = Calculator.calculateTAS_OAT(staticPressureValue,
@@ -201,6 +205,167 @@ class Parser {
 		System.out.println("RESULTS: " + (arr[0] - Constants.KELVIN) + " ºC|"
 				+ arr[1] + " knots");
 		return results;
+	}
+
+	/**
+	 * Tests input for the following conditions: 
+	 * 1. if result == -1 (had -- on the file) 
+	 * 2. if pressure 
+	 * 		-> see last 4 lines read if all the inputs are
+	 * equal or if new input is out of interval [-0.1 + p;p+0.1] p being the
+	 * median of the last 4 inputs 
+	 * 	  if !pressure
+	 * 		-> same procedure, only check 10 inputs and the interval to 
+	 * check is [-10 + t ; t+10] -> t being the
+	 * median of last 10 temperatures 
+	 * 3. if pressure -> check if value is in [100;1500] 
+	 * 	if ! pressure -> check if value is in [-100;100]
+	 * @param value
+	 *            value of input
+	 * @param type
+	 *            which input it is
+	 * @return true/false (if input is valid or not)
+	 */
+	private static boolean testInputs(Double value, String type) {
+		ResultSet rs = null;
+		String query = "";
+		ArrayList<Double> list = new ArrayList<Double>();
+		// verify type passed as params
+		if (type.equals(Constants.FIRST_PITOT_DYNAMIC)
+				|| type.equals(Constants.FIRST_PITOT_STATIC)
+				|| type.equals(Constants.SECOND_PITOT_DYNAMIC)
+				|| type.equals(Constants.SECOND_PITOT_STATIC)
+				|| type.equals(Constants.THIRD_PITOT_DYNAMIC)
+				|| type.equals(Constants.THIRD_PITOT_STATIC)) {
+			// check if value is within limits
+			if (value < Constants.MIN_LIMIT_PRESSURE
+					|| value > Constants.MAX_LIMIT_PRESSURE)
+				return false;
+
+			// check 4 last inserted lines on table inputs
+			query = "select " + type.toLowerCase()
+					+ " from inputs where var_id = " + var_id
+					+ " and line_num < " + line_number + " limit "
+					+ Constants.ITERS_IGNORE_PRESSURE;
+			System.out.println("query = " + query);
+			try {
+				rs = DatabaseHandler.executeQuery(query);
+			} catch (SQLException e) {
+				e.printStackTrace();
+				DatabaseHandler.closeConnection();
+				System.exit(-1);
+			}
+			
+			try {
+				while(!rs.next()){
+					list.add(Double.parseDouble(rs.getString(type.toLowerCase())));
+				}
+			} catch (SQLException e) {
+				System.out.println("ERROR - EXITING");
+				e.printStackTrace();
+				DatabaseHandler.closeConnection();
+				System.exit(-1);
+			}
+			
+			// if there are no previous lines
+			if(list.isEmpty())
+				return true;
+			else{
+				if(list.size() == Constants.ITERS_IGNORE_PRESSURE){
+					// check if previous inputs are equal,
+					// and if next input is equal to the previous ones
+					boolean b = false;
+					Double prev = list.get(0);
+					for(Double d : list){
+						if(d != prev){
+							b = true;
+							break;
+						}
+					}
+					// if all values are equal, checks new input
+					if(!b){
+						if(value == prev){
+							return false;
+						}
+					}
+				}
+				// passing to next test :
+				// checks if value is in interval [-0.1 + p;p+0.1] p being the
+				// median of the last 4 inputs 
+					
+				Collections.sort(list);
+				Double median = median(list);
+				if(value < (median - Constants.DELTA_PRESSURE) || 
+						value > (median + Constants.DELTA_PRESSURE)){
+					return false;
+				}else return true;
+				
+			}
+		} else if (type.equals(Constants.FIRST_TEMP)
+				|| type.equals(Constants.SECOND_TEMP)) {
+			// check if value is within limits
+			if (value < Constants.MIN_LIMIT_TEMP
+					|| value > Constants.MAX_LIMIT_TEMP)
+				return false;
+			// check 10 last inserted lines on table inputs
+			query = "select " + type.toLowerCase()
+					+ " from inputs where var_id = " + var_id
+					+ " and line_num < " + line_number + " limit "
+					+ Constants.ITERS_IGNORE_TEMP;
+			try {
+				rs = DatabaseHandler.executeQuery(query);
+			} catch (SQLException e) {
+				e.printStackTrace();
+				DatabaseHandler.closeConnection();
+				System.exit(-1);
+			}
+			
+			try {
+				while(!rs.next()){
+					list.add(Double.parseDouble(rs.getString(type.toLowerCase())));
+				}
+			} catch (SQLException e) {
+				System.out.println("ERROR - EXITING");
+				e.printStackTrace();
+				DatabaseHandler.closeConnection();
+				System.exit(-1);
+			}
+			
+			// if there are no previous lines
+			if(list.isEmpty())
+				return true;
+			else{
+				if(list.size() == Constants.ITERS_IGNORE_TEMP){
+					// check if previous inputs are equal,
+					// and if next input is equal to the previous ones
+					boolean b = false;
+					Double prev = list.get(0);
+					for(Double d : list){
+						if(d != prev){
+							b = true;
+							break;
+						}
+					}
+					// if all values are equal, checks new input
+					if(!b){
+						if(value == prev){
+							return false;
+						}
+					}
+				}
+				// passing to next test :
+				// checks if value is in interval [-0.1 + p;p+0.1] p being the
+				// median of the last 4 inputs 
+					
+				Collections.sort(list);
+				Double median = median(list);
+				if(value < (median - Constants.DELTA_TEMP) || 
+						value > (median + Constants.DELTA_TEMP)){
+					return false;
+				}else return true;
+			}
+		} else
+			return false;
 	}
 
 	private static int countLines(String filename) throws IOException {
@@ -334,7 +499,8 @@ class Parser {
 		}
 
 		try {
-			if (!query_result.next()) { // if empty set, since fucker doesnt have a size method -.-
+			if (!query_result.next()) { // if empty set, since fucker doesnt
+										// have a size method -.-
 				// query didnt return results, new row will be inserted
 				update = "insert into blocks values(" + var_id + ",'" + sensor
 						+ "'," + iters + "," + previous_failures + ")";
@@ -352,16 +518,17 @@ class Parser {
 			} else {
 				/*
 				 * query returned results, row shall be analysed and updated
-				 * accordingly: 1. if prev_failure=2 = do nothing, sensor is banned
-				 * forever; 2. if iters>0 && prev_failure=1 = iters--; 3. if iters=0
-				 * && prev_failure=1 = prev_failure = 2; else error
+				 * accordingly: 1. if prev_failure=2 = do nothing, sensor is
+				 * banned forever; 2. if iters>0 && prev_failure=1 = iters--; 3.
+				 * if iters=0 && prev_failure=1 = prev_failure = 2; else error
 				 */
 				try {
 					iters = Integer.parseInt(query_result
 							.getString("iters_to_ignore"));
 					previous_failures = Integer.parseInt(query_result
 							.getString("previous_failure"));
-					System.out.println("iters = " + iters + "| previous failures = " + previous_failures);
+					System.out.println("iters = " + iters
+							+ "| previous failures = " + previous_failures);
 				} catch (NumberFormatException e) {
 					System.out.println("ERROR - EXITING............");
 					e.printStackTrace();
@@ -393,8 +560,8 @@ class Parser {
 						System.out.println("Row successfully modified.");
 					} else if (iters == 0) {
 						// previous_failures = 2
-						update = "update blocks set previous_failure = 2 where var_id = " + var_id
-								+ " and sensor = '" + sensor + "'";
+						update = "update blocks set previous_failure = 2 where var_id = "
+								+ var_id + " and sensor = '" + sensor + "'";
 						System.out.println("Row to update:" + update);
 						try {
 							DatabaseHandler.executeUpdate(update);
@@ -407,15 +574,18 @@ class Parser {
 						System.out.println("Row successfully modified.");
 					} else {
 						// error
-						System.out.println("ERROR - prev_failure!=1 && prev_failure != 1 or iters < 0 - EXITING");
+						System.out
+								.println("ERROR - prev_failure!=1 && prev_failure != 1 or iters < 0 - EXITING");
 						DatabaseHandler.closeConnection();
 						System.exit(-1);
 					}
 				}
 			}
 		} catch (SQLException e) {
-			// TODO Auto-generated catch block
+			System.out.println("ERROR - EXITING");
 			e.printStackTrace();
+			DatabaseHandler.closeConnection();
+			System.exit(-1);
 		}
 	}
 
@@ -460,12 +630,15 @@ class Parser {
 				}
 				res = DatabaseHandler
 						.executeQuery("select * from blocks where var_id = "
-								+ var_id);/* var_id + ",'" + sensor
-						+ "'," + iters + "," + previous_failures + ")"*/
+								+ var_id);/*
+										 * var_id + ",'" + sensor + "'," + iters
+										 * + "," + previous_failures + ")"
+										 */
 				while (res.next()) {
 					System.out.println(res.getString("var_id") + "|"
-							+ res.getString("sensor") + "|" + res.getString("iters")
-							+ "|" + res.getString("previous_failures") + "|");
+							+ res.getString("sensor") + "|"
+							+ res.getString("iters") + "|"
+							+ res.getString("previous_failures") + "|");
 				}
 			} catch (IOException e) {
 				System.out.println("ERROR - EXITING............");
