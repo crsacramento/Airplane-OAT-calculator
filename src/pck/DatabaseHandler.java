@@ -25,8 +25,9 @@ class DatabaseHandler {
 			try {
 				Class.forName(sDriverName);
 			} catch (ClassNotFoundException e) {
-				System.out.println("ERROR - EXITING............");
-				e.printStackTrace();
+				//System.out.println("ERROR - EXITING............");
+				//e.printStackTrace();
+				System.out.println("FAIL_SAFE(19)");
 				closeConnection();
 				System.exit(-1);
 			}
@@ -36,8 +37,9 @@ class DatabaseHandler {
 			try {
 				conn = DriverManager.getConnection(sDbUrl);
 			} catch (SQLException e) {
-				System.out.println("ERROR - EXITING............");
-				e.printStackTrace();
+				//System.out.println("ERROR - EXITING............");
+				//e.printStackTrace();
+				System.out.println("FAIL_SAFE(20)");
 				closeConnection();
 				System.exit(-1);
 			}

@@ -105,36 +105,39 @@ class Parser {
 		}
 	}
 
-	private static HashMap<String, Double> parseLine(String line) {
+	private static double[] parseLine(String line) {
 		// access file, get specified line
 		// HashMap<String, Double> results =
 		// parseFileString("23# 1110.00:1000.00,120.00:1110.00,1190.00:900.00,-52.98,-53.21");
 
-		System.out.println("Line parsed: " + line);
+		//System.out.println("Line parsed: " + line);
 		HashMap<String, Double> results = parseFileString(line);
 		if (results == null) {
-			System.out.println("ERROR - EXITING............");
+			// System.out.println("ERROR - EXITING............");
+			System.out.println("FAIL_SAFE(1)");
 			DatabaseHandler.closeConnection();
 			System.exit(-1);
 		}
 
-		ArrayList<Double> staticPressure = new ArrayList<Double>(), dynamicPressure = new ArrayList<Double>(), temperature = new ArrayList<Double>();
+		ArrayList<Double> staticPressure = new ArrayList<Double>(),
+				dynamicPressure = new ArrayList<Double>(),
+				temperature = new ArrayList<Double>();
 
 		// initialize static pressure list
 		if (validSensors.get(Constants.DB_P1)) {
 			if (testInputs(results.get(Constants.FIRST_PITOT_STATIC),
 					Constants.FIRST_PITOT_STATIC)) {
-				staticPressure.add(results.get(Constants.FIRST_PITOT_STATIC));
+				dynamicPressure.add(results.get(Constants.FIRST_PITOT_STATIC));
 			} else {
 				// sensor had an error, ignore input and write to database to
 				// ignore future iterations
 				/* var_id,sensor,iters_to_ignore,previous_failure, */
 				modifyBlocksBD(Constants.DB_P1);
 			}
-			
+
 			if (testInputs(results.get(Constants.FIRST_PITOT_DYNAMIC),
 					Constants.FIRST_PITOT_DYNAMIC)) {
-				dynamicPressure.add(results.get(Constants.FIRST_PITOT_DYNAMIC));
+				staticPressure.add(results.get(Constants.FIRST_PITOT_DYNAMIC));
 			}
 		} else {
 			modifyBlocksBD(Constants.DB_P1);
@@ -143,14 +146,15 @@ class Parser {
 		if (validSensors.get(Constants.DB_P2)) {
 			if (testInputs(results.get(Constants.SECOND_PITOT_STATIC),
 					Constants.SECOND_PITOT_STATIC)) {
-				staticPressure.add(results.get(Constants.SECOND_PITOT_STATIC));
+				dynamicPressure.add(results.get(Constants.SECOND_PITOT_STATIC));
 			} else {
 				modifyBlocksBD(Constants.DB_P2);
 			}
-			
+
 			if (testInputs(results.get(Constants.SECOND_PITOT_DYNAMIC),
 					Constants.SECOND_PITOT_DYNAMIC)) {
-				dynamicPressure.add(results.get(Constants.SECOND_PITOT_DYNAMIC));
+				staticPressure
+						.add(results.get(Constants.SECOND_PITOT_DYNAMIC));
 			}
 		} else {
 			modifyBlocksBD(Constants.DB_P2);
@@ -159,14 +163,14 @@ class Parser {
 		if (validSensors.get(Constants.DB_P3)) {
 			if (testInputs(results.get(Constants.THIRD_PITOT_STATIC),
 					Constants.THIRD_PITOT_STATIC)) {
-				staticPressure.add(results.get(Constants.THIRD_PITOT_STATIC));
+				dynamicPressure.add(results.get(Constants.THIRD_PITOT_STATIC));
 			} else {
 				modifyBlocksBD(Constants.DB_P3);
 			}
-			
+
 			if (testInputs(results.get(Constants.THIRD_PITOT_DYNAMIC),
 					Constants.THIRD_PITOT_DYNAMIC)) {
-				dynamicPressure.add(results.get(Constants.THIRD_PITOT_DYNAMIC));
+				staticPressure.add(results.get(Constants.THIRD_PITOT_DYNAMIC));
 			}
 		} else {
 			modifyBlocksBD(Constants.DB_P3);
@@ -193,6 +197,7 @@ class Parser {
 		} else {
 			modifyBlocksBD(Constants.DB_T2);
 		}
+
 		// sort lists
 		Collections.sort(staticPressure);
 		Collections.sort(dynamicPressure);
@@ -201,25 +206,81 @@ class Parser {
 		// get medians
 		double staticPressureValue = median(staticPressure), dynamicPressureValue = median(dynamicPressure), temperatureValue = median(temperature);
 
-		System.out.println("static pressure value: " + staticPressureValue
-				+ "\ndynamic pressure value: " + dynamicPressureValue
-				+ "\ntemperature value: " + temperatureValue);
+		// test if inputs are in [p-10%, p+10%] -> p: median of inputs received
+		/*for (Double d : staticPressure) {
+			if (d < (staticPressureValue * 0.9)
+					|| d > (staticPressureValue * 1.1)) {
+				// System.out.println("ERROR - STATIC PRESSURE VALUE " + d +
+				// " IS OUT OF RANGE [" + (staticPressureValue * 0.9) + "," +
+				// (staticPressureValue * 1.1) + "]");
+				System.out.println("FAIL_SAFE(2)");
+				DatabaseHandler.closeConnection();
+				System.exit(-1);
+			}
+		}
+		for (Double d : dynamicPressure) {
+			if (d < (dynamicPressureValue * 0.9)
+					|| d > (dynamicPressureValue * 1.1)) {
+				// System.out.println("ERROR - DYNAMIC PRESSURE VALUE " + d +
+				// " IS OUT OF RANGE [" + (dynamicPressureValue * 0.9) + "," +
+				// (dynamicPressureValue * 1.1) + "]");
+				System.out.println("FAIL_SAFE(3)");
+				DatabaseHandler.closeConnection();
+				System.exit(-1);
+			}
+		}*/
+		/*for (Double d : temperature) {
+			if (d < (temperatureValue * 0.9) || d > (temperatureValue * 1.1)) {
+				 System.out.println("ERROR - TEMPERATURE VALUE " + d +
+				 " IS OUT OF RANGE [" + (temperatureValue * 0.9) + "," +
+				 (temperatureValue * 1.1) + "]");
+				System.out.println("FAIL_SAFE(4)");
+				DatabaseHandler.closeConnection();
+				System.exit(-1);
+			}
+		}*/
 
+		/*
+		 * System.out.println("static pressure value: " + staticPressureValue +
+		 * "\ndynamic pressure value: " + dynamicPressureValue +
+		 * "\ntemperature value: " + temperatureValue);
+		 */
+
+		String update = "insert into inputs values(" + line_number + ","
+				+ var_id + "," + results.get(Constants.FIRST_PITOT_DYNAMIC)
+				+ "," + results.get(Constants.FIRST_PITOT_STATIC) + ","
+				+ results.get(Constants.SECOND_PITOT_DYNAMIC) + ","
+				+ results.get(Constants.SECOND_PITOT_STATIC) + ","
+				+ results.get(Constants.THIRD_PITOT_DYNAMIC) + ","
+				+ results.get(Constants.THIRD_PITOT_STATIC) + ","
+				+ results.get(Constants.FIRST_TEMP) + ","
+				+ results.get(Constants.SECOND_TEMP) + ")";
+		// System.out.println("Row to insert:" + update);
+		try {
+			DatabaseHandler.executeUpdate(update);
+		} catch (SQLException e) {
+			System.out.println("FAIL_SAFE(5)");
+			DatabaseHandler.closeConnection();
+			System.exit(-1);
+		}
+		
 		double[] arr = Calculator.calculateTAS_OAT(staticPressureValue,
 				dynamicPressureValue, temperatureValue);
-		System.out.println("RESULTS: " + (arr[0] - Constants.KELVIN) + " ºC|"
-				+ arr[1] + " knots");
-		return results;
+		arr[1]=arr[1]-Constants.KELVIN;
+		/*
+		 * System.out.println("RESULTS: " + (arr[0] - Constants.KELVIN) + " ï¿½C|"
+		 * + arr[1] + " knots");
+		 */
+		return arr;
 	}
 
 	/**
 	 * Tests input for the following conditions: 1. if result == -1 (had -- on
-	 * the file) 2. if pressure -> see last 4 lines read if all the inputs are
-	 * equal or if new input is out of interval [-0.1 + p;p+0.1] p being the
-	 * median of the last 4 inputs if !pressure -> same procedure, only check 10
-	 * inputs and the interval to check is [-10 + t ; t+10] -> t being the
-	 * median of last 10 temperatures 3. if pressure -> check if value is in
-	 * [100;1500] if ! pressure -> check if value is in [-100;100]
+	 * the file) 2. if pressure -> see last 4 lines, read if all the inputs are
+	 * equal if !pressure -> same procedure, only check 10 inputs 3. if pressure
+	 * -> check if value is in [100;1500] if !pressure -> check if value is in
+	 * [-100;100] 4. check if input is out of interval [-0.1 + p;p+0.1] p being
+	 * the median of the inputs received
 	 * 
 	 * @param value
 	 *            value of input
@@ -248,7 +309,7 @@ class Parser {
 					+ " from inputs where var_id = " + var_id
 					+ " and line_num < " + line_number + " limit "
 					+ Constants.ITERS_IGNORE_PRESSURE;
-			System.out.println("query = " + query);
+			//System.out.println("query = " + query);
 			try {
 				rs = DatabaseHandler.executeQuery(query);
 			} catch (SQLException e) {
@@ -267,8 +328,9 @@ class Parser {
 					}
 				}
 			} catch (SQLException e) {
-				System.out.println("ERROR - EXITING");
-				e.printStackTrace();
+				// System.out.println("ERROR - EXITING");
+				// e.printStackTrace();
+				System.out.println("FAIL_SAFE(6)");
 				DatabaseHandler.closeConnection();
 				System.exit(-1);
 			}
@@ -295,17 +357,7 @@ class Parser {
 						}
 					}
 				}
-				// passing to next test :
-				// checks if value is in interval [-0.1 + p;p+0.1] p being the
-				// median of the last 4 inputs
-
-				Collections.sort(list);
-				Double median = median(list);
-				if (value < (median - Constants.DELTA_PRESSURE)
-						|| value > (median + Constants.DELTA_PRESSURE)) {
-					return false;
-				} else
-					return true;
+				return true;
 			}
 		} else if (type.equals(Constants.FIRST_TEMP)
 				|| type.equals(Constants.SECOND_TEMP)) {
@@ -336,8 +388,9 @@ class Parser {
 					}
 				}
 			} catch (SQLException e) {
-				System.out.println("ERROR - EXITING");
-				e.printStackTrace();
+				// System.out.println("ERROR - EXITING");
+				// e.printStackTrace();
+				System.out.println("FAIL_SAFE(7)");
 				DatabaseHandler.closeConnection();
 				System.exit(-1);
 			}
@@ -364,17 +417,7 @@ class Parser {
 						}
 					}
 				}
-				// passing to next test :
-				// checks if value is in interval [-0.1 + p;p+0.1] p being the
-				// median of the last 4 inputs
-
-				Collections.sort(list);
-				Double median = median(list);
-				if (value < (median - Constants.DELTA_TEMP)
-						|| value > (median + Constants.DELTA_TEMP)) {
-					return false;
-				} else
-					return true;
+				return true;
 			}
 		} else
 			return false;
@@ -406,8 +449,8 @@ class Parser {
 		// checks file
 		file = new File(args[0]);
 		if (!file.exists()) {
-			System.out
-					.println("ERROR - FILE DOESN'T EXIST, EXITING............");
+			// System.out.println("ERROR - FILE DOESN'T EXIST, EXITING");
+			System.out.println("FAIL_SAFE(8)");
 			System.exit(-1);
 		} else {
 			filePath = args[0];
@@ -421,22 +464,26 @@ class Parser {
 		try {
 			int number = countLines(args[0]);
 			if (Integer.parseInt(args[2]) > number) {
-				System.out
-						.println("ERROR - LINE NUMBER IS SUPERIOR TO NUMBER OF LINES IN FILE ("
-								+ number + "). EXITING............");
+				/*
+				 * System.out .println(
+				 * "ERROR - LINE NUMBER IS SUPERIOR TO NUMBER OF LINES IN FILE ("
+				 * + number + "). EXITING");
+				 */
+				System.out.println("FAIL_SAFE(9)");
 				DatabaseHandler.closeConnection();
 				System.exit(-1);
 			} else {
 				line_number = Integer.parseInt(args[2]);
 			}
 		} catch (IOException e) {
-			System.out.println("ERROR - EXITING............");
-			e.printStackTrace();
+			// System.out.println("ERROR - EXITING............");
+			// e.printStackTrace();
+			System.out.println("FAIL_SAFE(10)");
 			DatabaseHandler.closeConnection();
 			System.exit(-1);
 		}
 
-		System.out.println("Arguments are correct.");
+		//System.out.println("Arguments are correct.");
 	}
 
 	private static String readSpecificLine(int line_num) throws IOException {
@@ -449,60 +496,57 @@ class Parser {
 		return res;
 	}
 
-	public static void modifyBlocksBD(String sensorInError) {
+	private static void modifyBlocksBD(String sensorInError) {
 		/* var_id,sensor,iters_to_ignore,previous_failure, */
 		String sensor = "", update = "", query = "";
 		int iters = 0, previous_failures = 0;
 		ResultSet query_result = null;
 		// determine the sensor involved
-		switch (sensorInError) {
-		case Constants.DB_P1: {
+		if (sensorInError.equals(Constants.DB_P1)) {
 			sensor = Constants.DB_P1;
 			iters = Constants.ITERS_IGNORE_PRESSURE;
 			previous_failures = 1;
-			break;
 		}
-		case Constants.DB_P2:{
+		else if (sensorInError.equals(Constants.DB_P2)) {
 			sensor += Constants.DB_P2;
 			iters = Constants.ITERS_IGNORE_PRESSURE;
 			previous_failures = 1;
-			break;
 		}
-		case Constants.DB_P3: {
+		else if (sensorInError.equals(Constants.DB_P3)) {
 			sensor += Constants.DB_P3;
 			iters = Constants.ITERS_IGNORE_PRESSURE;
 			previous_failures = 1;
-			break;
 		}
-		case Constants.DB_T1: {
+		else if (sensorInError.equals(Constants.DB_T1)) {
 			sensor += Constants.DB_T1;
 			iters = Constants.ITERS_IGNORE_TEMP;
 			previous_failures = 1;
-			break;
 		}
-		case Constants.DB_T2: {
+		else if (sensorInError.equals(Constants.DB_T2)) {
 			sensor += Constants.DB_T2;
 			iters = Constants.ITERS_IGNORE_TEMP;
 			previous_failures = 1;
-			break;
 		}
-		default:
-			System.out.println("WRONG SENSOR INPUT (" + sensorInError + ") - EXITING");
+		else {
+			// System.out.println("WRONG SENSOR INPUT (" + sensorInError +
+			// ") - EXITING");
+			System.out.println("FAIL_SAFE(11)");
 			DatabaseHandler.closeConnection();
 			System.exit(-1);
 		}
 
 		query = "select * from blocks where var_id = " + var_id
 				+ " and sensor = '" + sensor + "'";
-		System.out.println("query = " + query);
+		// System.out.println("query = " + query);
 
 		// execute query, check if there's a row in the table referring to this
 		// variant and sensor
 		try {
 			query_result = DatabaseHandler.executeQuery(query);
 		} catch (SQLException e) {
-			System.out.println("ERROR - EXITING............");
-			e.printStackTrace();
+			// System.out.println("ERROR - EXITING............");
+			// e.printStackTrace();
+			System.out.println("FAIL_SAFE(12)");
 			DatabaseHandler.closeConnection();
 			System.exit(-1);
 		}
@@ -513,17 +557,18 @@ class Parser {
 				// query didnt return results, new row will be inserted
 				update = "insert into blocks values(" + var_id + ",'" + sensor
 						+ "'," + iters + "," + previous_failures + ")";
-				System.out.println("update = " + update);
-				System.out.println("Row to update:" + update);
+				//System.out.println("update = " + update);
+				//System.out.println("Row to update:" + update);
 				try {
 					DatabaseHandler.executeUpdate(update);
 				} catch (SQLException e) {
-					System.out.println("ERROR - EXITING............");
-					e.printStackTrace();
+					// System.out.println("ERROR - EXITING............");
+					// e.printStackTrace();
+					System.out.println("FAIL_SAFE(12)");
 					DatabaseHandler.closeConnection();
 					System.exit(-1);
 				}
-				System.out.println("Row successfully inserted.");
+				//System.out.println("Row successfully inserted.");
 			} else {
 				/*
 				 * query returned results, row shall be analysed and updated
@@ -536,16 +581,18 @@ class Parser {
 							.getString("iters_to_ignore"));
 					previous_failures = Integer.parseInt(query_result
 							.getString("previous_failure"));
-					System.out.println("iters = " + iters
-							+ "| previous failures = " + previous_failures);
+					//System.out.println("iters = " + iters
+						//	+ "| previous failures = " + previous_failures);
 				} catch (NumberFormatException e) {
-					System.out.println("ERROR - EXITING............");
-					e.printStackTrace();
+					// System.out.println("ERROR - EXITING............");
+					// e.printStackTrace();
+					System.out.println("FAIL_SAFE(13)");
 					DatabaseHandler.closeConnection();
 					System.exit(-1);
 				} catch (SQLException e) {
-					System.out.println("ERROR - EXITING............");
-					e.printStackTrace();
+					// System.out.println("ERROR - EXITING............");
+					// e.printStackTrace();
+					System.out.println("FAIL_SAFE(14)");
 					DatabaseHandler.closeConnection();
 					System.exit(-1);
 				}
@@ -556,43 +603,49 @@ class Parser {
 						update = "update blocks set iters_to_ignore = "
 								+ (iters - 1) + " where var_id = " + var_id
 								+ " and sensor = '" + sensor + "'";
-						System.out.println("update = " + update);
-						System.out.println("Row to update:" + update);
+						//System.out.println("update = " + update);
+						//System.out.println("Row to update:" + update);
 						try {
 							DatabaseHandler.executeUpdate(update);
 						} catch (SQLException e) {
-							System.out.println("ERROR - EXITING............");
-							e.printStackTrace();
+							// System.out.println("ERROR - EXITING............");
+							// e.printStackTrace();
 							DatabaseHandler.closeConnection();
 							System.exit(-1);
 						}
-						System.out.println("Row successfully modified.");
+						// System.out.println("Row successfully modified.");
 					} else if (iters == 0) {
 						// previous_failures = 2
 						update = "update blocks set previous_failure = 2 where var_id = "
 								+ var_id + " and sensor = '" + sensor + "'";
-						System.out.println("Row to update:" + update);
+						// System.out.println("Row to update:" + update);
 						try {
 							DatabaseHandler.executeUpdate(update);
 						} catch (SQLException e) {
-							System.out.println("ERROR - EXITING............");
-							e.printStackTrace();
+							// System.out.println("ERROR - EXITING............");
+							// e.printStackTrace();
+							System.out.println("FAIL_SAFE(15)");
 							DatabaseHandler.closeConnection();
 							System.exit(-1);
 						}
-						System.out.println("Row successfully modified.");
+						// System.out.println("Row successfully modified.");
 					} else {
 						// error
-						System.out
-								.println("ERROR - prev_failure!=1 && prev_failure != 1 or iters < 0 - EXITING");
+						/*
+						 * System.out .println(
+						 * "ERROR - prev_failure!=1 && prev_failure != 1 or iters < 0 - EXITING"
+						 * );
+						 */
+						System.out.println("FAIL_SAFE(16)");
 						DatabaseHandler.closeConnection();
 						System.exit(-1);
 					}
 				}
 			}
 		} catch (SQLException e) {
-			System.out.println("ERROR - EXITING");
-			e.printStackTrace();
+			// System.out.println("ERROR - EXITING");
+			// e.printStackTrace();
+			System.out.println("FAIL_SAFE(17)");
 			DatabaseHandler.closeConnection();
 			System.exit(-1);
 		}
@@ -605,8 +658,9 @@ class Parser {
 					.executeQuery("select * from blocks where var_id = "
 							+ var_id);
 		} catch (SQLException e) {
-			System.out.println("ERROR - EXITING");
-			e.printStackTrace();
+			// System.out.println("ERROR - EXITING");
+			// e.printStackTrace();
+			System.out.println("FAIL_SAFE(18)");
 			DatabaseHandler.closeConnection();
 			System.exit(-1);
 		}/*
@@ -618,73 +672,69 @@ class Parser {
 				int iters = Integer.parseInt(res.getString("iters_to_ignore"));
 				int previous_failures = Integer.parseInt(res
 						.getString("previous_failure"));
-				switch (sensor.toUpperCase()) {
-				case Constants.DB_P1: {
+				
+				if (sensor.toUpperCase().equals(Constants.DB_P1)) {
 					if (iters == 0 && previous_failures < 2)
 						validSensors.put(Constants.DB_P1, true);
 					else {
 						validSensors.put(Constants.DB_P1, false);
 					}
-					break;
 				}
-				case Constants.DB_P2: {
+				else if (sensor.toUpperCase().equals(Constants.DB_P2)) {
 					if (iters == 0 && previous_failures < 2)
 						validSensors.put(Constants.DB_P2, true);
 					else {
 						validSensors.put(Constants.DB_P2, false);
 					}
-					break;
 				}
-				case Constants.DB_P3: {
+				else if (sensor.toUpperCase().equals(Constants.DB_P3)) {
 					if (iters == 0 && previous_failures < 2)
 						validSensors.put(Constants.DB_P3, true);
 					else {
 						validSensors.put(Constants.DB_P3, false);
 					}
-					break;
 				}
-				case Constants.DB_T1: {
+				else if (sensor.toUpperCase().equals(Constants.DB_T1)) {
 					if (iters == 0 && previous_failures < 2)
 						validSensors.put(Constants.DB_T1, true);
 					else {
 						validSensors.put(Constants.DB_T1, false);
 					}
-					break;
 				}
-				case Constants.DB_T2: {
+				else if (sensor.toUpperCase().equals(Constants.DB_T2)) {
 					if (iters == 0 && previous_failures < 2)
 						validSensors.put(Constants.DB_T2, true);
 					else {
 						validSensors.put(Constants.DB_T2, false);
 					}
-					break;
 				}
-				default: {
+				else {
 					System.out
 							.println("ERROR - INVALID SENSOR IN TABLE BLOCKS ("
 									+ sensor + ") - EXITING");
 					DatabaseHandler.closeConnection();
 					System.exit(-1);
 				}
-				}
-				// now fill hashmap with sensors not found in the query
-				if (validSensors.get(Constants.DB_P1) == null)
-					validSensors.put(Constants.DB_P1, true);
-				if (validSensors.get(Constants.DB_P2) == null)
-					validSensors.put(Constants.DB_P2, true);
-				if (validSensors.get(Constants.DB_P3) == null)
-					validSensors.put(Constants.DB_P3, true);
-				if (validSensors.get(Constants.DB_T1) == null)
-					validSensors.put(Constants.DB_T1, true);
-				if (validSensors.get(Constants.DB_T2) == null)
-					validSensors.put(Constants.DB_T2, true);
 			}
 		} catch (SQLException e) {
-			System.out.println("ERROR - EXITING");
-			e.printStackTrace();
+			// System.out.println("ERROR - EXITING");
+			// e.printStackTrace();
+			System.out.println("FAIL_SAFE(19)");
 			DatabaseHandler.closeConnection();
 			System.exit(-1);
 		}
+
+		// now fill hashmap with sensors not found in the query
+		if (validSensors.get(Constants.DB_P1) == null)
+			validSensors.put(Constants.DB_P1, true);
+		if (validSensors.get(Constants.DB_P2) == null)
+			validSensors.put(Constants.DB_P2, true);
+		if (validSensors.get(Constants.DB_P3) == null)
+			validSensors.put(Constants.DB_P3, true);
+		if (validSensors.get(Constants.DB_T1) == null)
+			validSensors.put(Constants.DB_T1, true);
+		if (validSensors.get(Constants.DB_T2) == null)
+			validSensors.put(Constants.DB_T2, true);
 	}
 
 	public static void main(String[] args) {
@@ -696,62 +746,40 @@ class Parser {
 
 		// extracts, verifies and processes line
 		if (!filePath.equals("")) {
+			String line = null;
 			try {
-				String line = readSpecificLine(line_number);
-				HashMap<String, Double> results = parseLine(line);
-				// write to database = line_num, var_id, pd1, ps1, pd2, ps2,
-				// pd3, ps3, tp1, tp2
-				String update = "insert into inputs values(" + line_number
-						+ "," + var_id + ","
-						+ results.get(Constants.FIRST_PITOT_DYNAMIC) + ","
-						+ results.get(Constants.FIRST_PITOT_STATIC) + ","
-						+ results.get(Constants.SECOND_PITOT_DYNAMIC) + ","
-						+ results.get(Constants.SECOND_PITOT_STATIC) + ","
-						+ results.get(Constants.THIRD_PITOT_DYNAMIC) + ","
-						+ results.get(Constants.THIRD_PITOT_STATIC) + ","
-						+ results.get(Constants.FIRST_TEMP) + ","
-						+ results.get(Constants.SECOND_TEMP) + ")";
-				System.out.println("Row to insert:" + update);
-				DatabaseHandler.executeUpdate(update);
-				System.out.println("Row successfully inserted.");
-
-				// for testing purposes
-				ResultSet res = DatabaseHandler
-						.executeQuery("select * from inputs where var_id = "
-								+ var_id);
-				while (res.next()) {
-					System.out.println(res.getString("line_num") + "|"
-							+ res.getString("var_id") + "|"
-							+ res.getString("pd1") + "|" + res.getString("ps1")
-							+ "|" + res.getString("pd2") + "|"
-							+ res.getString("ps2") + "|" + res.getString("pd3")
-							+ "|" + res.getString("ps3") + "|"
-							+ res.getString("tp1") + "|" + res.getString("tp2")
-							+ "|");
-				}
-				res = DatabaseHandler
-						.executeQuery("select * from blocks where var_id = "
-								+ var_id);/*
-										 * var_id + ",'" + sensor + "'," + iters
-										 * + "," + previous_failures + ")"
-										 */
-				while (res.next()) {
-					System.out.println(res.getString("var_id") + "|"
-							+ res.getString("sensor") + "|"
-							+ res.getString("iters_to_ignore") + "|"
-							+ res.getString("previous_failure") + "|");
-				}
+				line = readSpecificLine(line_number);
 			} catch (IOException e) {
-				System.out.println("ERROR - EXITING............");
+				// TODO Auto-generated catch block
 				e.printStackTrace();
-				DatabaseHandler.closeConnection();
-				System.exit(-1);
-			} catch (SQLException e) {
-				System.out.println("ERROR - EXITING............");
-				e.printStackTrace();
-				DatabaseHandler.closeConnection();
-				System.exit(-1);
 			}
+			double[] results = parseLine(line);
+			System.out.println(args[2] + "#: " + results[0] + ", " + results[1]);
+			// write to database = line_num, var_id, pd1, ps1, pd2, ps2,
+			// pd3, ps3, tp1, tp2
+
+			// System.out.println("Row successfully inserted.");
+
+			// for testing purposes
+			/*
+			 * ResultSet res = DatabaseHandler
+			 * .executeQuery("select * from inputs where var_id = " + var_id);
+			 * while (res.next()) { System.out.println(res.getString("line_num")
+			 * + "|" + res.getString("var_id") + "|" + res.getString("pd1") +
+			 * "|" + res.getString("ps1") + "|" + res.getString("pd2") + "|" +
+			 * res.getString("ps2") + "|" + res.getString("pd3") + "|" +
+			 * res.getString("ps3") + "|" + res.getString("tp1") + "|" +
+			 * res.getString("tp2") + "|"); } res = DatabaseHandler
+			 * .executeQuery("select * from blocks where var_id = " + var_id);/*
+			 * var_id + ",'" + sensor + "'," + iters + "," + previous_failures +
+			 * ")"
+			 */
+			/*
+			 * while (res.next()) { System.out.println(res.getString("var_id") +
+			 * "|" + res.getString("sensor") + "|" +
+			 * res.getString("iters_to_ignore") + "|" +
+			 * res.getString("previous_failure") + "|"); }
+			 */
 		}
 	}
 }

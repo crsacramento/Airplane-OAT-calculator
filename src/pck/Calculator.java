@@ -15,7 +15,7 @@ public class Calculator {
 	 */
 	private static double machNumber(double staticPressure,
 			double dynamicPressure) {
-		return ((Math.pow(((dynamicPressure / staticPressure) + 1), (2.0 / 7)) - 1) * 5);
+		return Math.sqrt((Math.pow(((dynamicPressure / staticPressure) + 1), (2.0 / 7)) - 1) * 5);
 	}
 
 	/**
@@ -42,7 +42,7 @@ public class Calculator {
 	 * @return outside air temperature (in kelvin)
 	 */
 	private static double OAT(double staticAirTemperature, double machNumber) {
-		return ((staticAirTemperature + Constants.KELVIN)/ (1 + 0.2 * machNumber));
+		return ((staticAirTemperature + Constants.KELVIN)/ (1 + 0.2 * machNumber*machNumber));
 	}
 
 	/**
@@ -61,11 +61,11 @@ public class Calculator {
 	public static double[] calculateTAS_OAT(double staticPressure,
 			double dynamicPressure, double temperature) {
 		double machNumber = machNumber(staticPressure, dynamicPressure);
-		System.out.println("M: " + machNumber);
+		//System.out.println("M: " + machNumber);
 		double outsideAirTemp = OAT(temperature, machNumber);
-		System.out.println("OAT: " + outsideAirTemp);
+		//System.out.println("OAT: " + outsideAirTemp);
 		double trueSpeed = TAS(machNumber, outsideAirTemp);
-		System.out.println("TAS: " + trueSpeed);
-		return new double[] { outsideAirTemp, trueSpeed };
+		//System.out.println("TAS: " + trueSpeed);
+		return new double[] {trueSpeed, outsideAirTemp};
 	}
 }
